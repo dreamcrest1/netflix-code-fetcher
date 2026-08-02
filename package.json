@@ -1,0 +1,12 @@
+{
+  "name": "netflix-code-fetcher",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node api/fetch-latest-code.js"
+  },
+  "dependencies": {
+    "imapflow": "^1.0.171",
+    "mailparser": "^3.7.1"
+  }
+}
