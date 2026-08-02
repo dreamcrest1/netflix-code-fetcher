@@ -14,26 +14,6 @@ const ACCOUNTS_DB = {
   "nf3m@dreamcrest.net": { ...COMMON_HOST_CONFIG, auth: { user: "nf3m@dreamcrest.net", pass: "XXXNETFLIX1234" } }
 };
 
-function parseEmailContent(htmlContent, textContent) {
-  const content = htmlContent || textContent || "";
-  const codeMatch = content.match(/\b\d{4,8}\b/);
-  const code = codeMatch ? codeMatch[0] : null;
-
-  const urlMatch = content.match(/https?:\/\/[^\s"<']+/g);
-  let actionUrl = null;
-  if (urlMatch) {
-    actionUrl = urlMatch.find(url => 
-      url.includes('verify') || 
-      url.includes('account') || 
-      url.includes('travel') || 
-      url.includes('household') ||
-      url.includes('netflix.com')
-    ) || null;
-  }
-
-  return { code, actionUrl };
-}
-
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -62,35 +42,42 @@ module.exports = async (req, res) => {
 
   try {
     await client.connect();
-    let lock = await client.getMailboxLock('INBOX');
+    const lock = await client.getMailboxLock('INBOX');
 
+    let payload;
     try {
       const status = await client.status('INBOX', { messages: true });
       if (status.messages === 0) {
-        return res.status(404).json({ success: false, message: "Inbox is empty." });
+        payload = { statusCode: 404, body: { success: false, message: "Inbox is empty." } };
+      } else {
+        const message = await client.fetchOne(`${status.messages}`, { source: true, envelope: true });
+        const parsed = await simpleParser(message.source);
+
+        payload = {
+          statusCode: 200,
+          body: {
+            success: true,
+            data: {
+              email: email,
+              subject: parsed.subject || "No Subject",
+              from: parsed.from?.text || "Unknown Sender",
+              to: parsed.to?.text || email,
+              date: parsed.date || new Date(),
+              html: parsed.html || null,
+              text: parsed.text || "",
+              snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ').trim() : ""
+            }
+          }
+        };
       }
-
-      const message = await client.fetchOne(`${status.messages}`, { source: true, envelope: true });
-      const parsed = await simpleParser(message.source);
-      const { code, actionUrl } = parseEmailContent(parsed.html, parsed.text);
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          email: email,
-          subject: parsed.subject || "No Subject",
-          from: parsed.from?.text || "Netflix",
-          date: parsed.date || new Date(),
-          code: code,
-          actionUrl: actionUrl,
-          snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ') + "..." : ""
-        }
-      });
     } finally {
       lock.release();
     }
+
     await client.logout();
+    return res.status(payload.statusCode).json(payload.body);
   } catch (error) {
+    try { await client.logout(); } catch (_) {}
     return res.status(500).json({ 
       success: false, 
       message: "Failed to connect to webmail.",
