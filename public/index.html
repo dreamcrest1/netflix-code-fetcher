@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Netflix Code & Household Fetcher</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-between p-4 sm:p-6 font-sans">
+
+  <div class="w-full max-w-xl my-auto space-y-6">
+    <div class="text-center space-y-3">
+      <div class="inline-flex items-center gap-2 px-3 py-1 bg-red-600/10 border border-red-600/30 text-red-500 rounded-full text-xs font-semibold uppercase">
+        <i class="fa-solid fa-tv"></i> Access Code Portal
+      </div>
+      <h1 class="text-3xl font-bold tracking-tight text-white">Get Netflix Code</h1>
+      <p class="text-zinc-400 text-sm">Select your assigned email address to get the latest code or approval link.</p>
+    </div>
+
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-2xl space-y-4">
+      <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">Select Assigned Email</label>
+      <div class="space-y-3">
+        <select id="emailSelect" class="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-red-600 outline-none">
+          <option value="nf2m@dreamcrest.net">nf2m@dreamcrest.net</option>
+          <option value="p3m@dreamespire.com">p3m@dreamespire.com</option>
+          <option value="df3@dreamespire.com">df3@dreamespire.com</option>
+          <option value="nf3m@dreamcrest.net">nf3m@dreamcrest.net</option>
+        </select>
+        <button id="fetchBtn" onclick="fetchCode()" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg shadow-red-600/20">
+          <i id="btnIcon" class="fa-solid fa-rotate-right"></i>
+          <span id="btnText">Fetch Code</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="errorBox" class="hidden bg-red-950/40 border border-red-600/40 text-red-300 p-4 rounded-xl text-sm flex items-center gap-3">
+      <i class="fa-solid fa-circle-exclamation text-red-500"></i>
+      <span id="errorMessage">Unable to fetch mail.</span>
+    </div>
+
+    <div id="resultBox" class="hidden bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+        <div>
+          <span class="text-xs text-zinc-500 font-semibold uppercase">Latest Subject</span>
+          <p id="emailSubject" class="text-sm font-semibold text-zinc-200 mt-0.5">---</p>
+        </div>
+        <span id="emailTime" class="text-xs bg-zinc-950 border border-zinc-800 text-zinc-400 px-2 py-1 rounded">--:--</span>
+      </div>
+
+      <div id="codeContainer" class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <span class="text-xs text-zinc-500 font-semibold uppercase">Verification Code</span>
+          <div id="codeDisplay" class="text-3xl font-mono font-bold text-red-500">------</div>
+        </div>
+        <button onclick="copyCode()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-lg text-xs font-semibold">
+          <span id="copyText">Copy</span>
+        </button>
+      </div>
+
+      <div id="linkContainer" class="hidden">
+        <a id="actionBtn" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/30 rounded-xl text-sm font-semibold">
+          <span>Click Here: THIS IS MY ACCOUNT</span>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-xs text-zinc-600 py-4">Hosted on netflix.dreamcrest.net</footer>
+
+  <script>
+    let currentCode = "";
+    async function fetchCode() {
+      const email = document.getElementById('emailSelect').value;
+      const fetchBtn = document.getElementById('fetchBtn');
+      const btnIcon = document.getElementById('btnIcon');
+      const btnText = document.getElementById('btnText');
+
+      fetchBtn.disabled = true;
+      btnIcon.classList.add('fa-spin');
+      btnText.innerText = "Connecting...";
+
+      document.getElementById('errorBox').classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/fetch-latest-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+        const result = await res.json();
+
+        if (!res.ok || !result.success) throw new Error(result.message || 'Error fetching email');
+
+        const data = result.data;
+        document.getElementById('emailSubject').innerText = data.subject;
+        document.getElementById('emailTime').innerText = new Date(data.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (data.code) {
+          currentCode = data.code;
+          document.getElementById('codeDisplay').innerText = data.code;
+        }
+
+        if (data.actionUrl) {
+          document.getElementById('actionBtn').href = data.actionUrl;
+          document.getElementById('linkContainer').classList.remove('hidden');
+        } else {
+          document.getElementById('linkContainer').classList.add('hidden');
+        }
+
+        document.getElementById('resultBox').classList.remove('hidden');
+      } catch(err) {
+        document.getElementById('errorMessage').innerText = err.message;
+        document.getElementById('errorBox').classList.remove('hidden');
+      } finally {
+        fetchBtn.disabled = false;
+        btnIcon.classList.remove('fa-spin');
+        btnText.innerText = "Fetch Code";
+      }
+    }
+
+    function copyCode() {
+      if(!currentCode) return;
+      navigator.clipboard.writeText(currentCode);
+      document.getElementById('copyText').innerText = "Copied!";
+      setTimeout(() => document.getElementById('copyText').innerText = "Copy", 2000);
+    }
+  </script>
+</body>
+</html>
