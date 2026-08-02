@@ -9,8 +9,8 @@ const COMMON_HOST_CONFIG = {
 
 const ACCOUNTS_DB = {
   "nf2m@dreamcrest.net": { ...COMMON_HOST_CONFIG, auth: { user: "nf2m@dreamcrest.net", pass: "Logical8794" } },
-  "p3m@dreamespire.com": { ...COMMON_HOST_CONFIG, auth: { user: "p3m@dreamespire.com", pass: "XXXNETFLIX123" } },
-  "df3@dreamespire.com": { ...COMMON_HOST_CONFIG, auth: { user: "df3@dreamespire.com", pass: "DreamCrestXXX123" } },
+  "p3m@dreamespire.com": { ...COMMON_HOST_CONFIG, auth: { user: "p3m@dreamespire.com", pass: "Logical8794" } },
+  "df3@dreamespire.com": { ...COMMON_HOST_CONFIG, auth: { user: "df3@dreamespire.com", pass: "XXXNETFLIX123" } },
   "nf3m@dreamcrest.net": { ...COMMON_HOST_CONFIG, auth: { user: "nf3m@dreamcrest.net", pass: "XXXNETFLIX1234" } }
 };
 
@@ -37,8 +37,16 @@ module.exports = async (req, res) => {
     port: config.port,
     secure: config.secure,
     auth: config.auth,
-    logger: false
+    logger: false,
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000
   });
+
+  // ImapFlow emits an 'error' event on socket timeouts/disconnects. Without a
+  // listener Node treats it as an unhandled error and crashes the function,
+  // which surfaced to users as a generic "Command failed".
+  client.on('error', () => {});
 
   try {
     await client.connect();
@@ -78,10 +86,28 @@ module.exports = async (req, res) => {
     return res.status(payload.statusCode).json(payload.body);
   } catch (error) {
     try { await client.logout(); } catch (_) {}
-    return res.status(500).json({ 
-      success: false, 
-      message: "Failed to connect to webmail.",
-      error: error.message 
+
+    // Translate the low-level IMAP error into a clear, user-facing message.
+    if (error.authenticationFailed) {
+      return res.status(401).json({
+        success: false,
+        message: `Login failed for ${email}. The mail server rejected the saved username/password for this mailbox.`,
+        error: error.responseText || "Authentication failed."
+      });
+    }
+
+    if (error.code === 'ETIMEOUT' || error.code === 'ETIMEDOUT' || /timeout/i.test(error.message || "")) {
+      return res.status(504).json({
+        success: false,
+        message: "The mail server did not respond in time. Please try again.",
+        error: error.message
+      });
+    }
+
+    return res.status(502).json({
+      success: false,
+      message: "Could not connect to the mail server.",
+      error: error.responseText || error.message
     });
   }
 };
