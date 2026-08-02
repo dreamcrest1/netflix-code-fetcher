@@ -14,26 +14,6 @@ const ACCOUNTS_DB = {
   "nf3m@dreamcrest.net": { ...COMMON_HOST_CONFIG, auth: { user: "nf3m@dreamcrest.net", pass: "XXXNETFLIX1234" } }
 };
 
-function parseEmailContent(htmlContent, textContent) {
-  const content = htmlContent || textContent || "";
-  const codeMatch = content.match(/\b\d{4,8}\b/);
-  const code = codeMatch ? codeMatch[0] : null;
-
-  const urlMatch = content.match(/https?:\/\/[^\s"<']+/g);
-  let actionUrl = null;
-  if (urlMatch) {
-    actionUrl = urlMatch.find(url => 
-      url.includes('verify') || 
-      url.includes('account') || 
-      url.includes('travel') || 
-      url.includes('household') ||
-      url.includes('netflix.com')
-    ) || null;
-  }
-
-  return { code, actionUrl };
-}
-
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -72,7 +52,6 @@ module.exports = async (req, res) => {
       } else {
         const message = await client.fetchOne(`${status.messages}`, { source: true, envelope: true });
         const parsed = await simpleParser(message.source);
-        const { code, actionUrl } = parseEmailContent(parsed.html, parsed.text);
 
         payload = {
           statusCode: 200,
@@ -81,11 +60,12 @@ module.exports = async (req, res) => {
             data: {
               email: email,
               subject: parsed.subject || "No Subject",
-              from: parsed.from?.text || "Netflix",
+              from: parsed.from?.text || "Unknown Sender",
+              to: parsed.to?.text || email,
               date: parsed.date || new Date(),
-              code: code,
-              actionUrl: actionUrl,
-              snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ') + "..." : ""
+              html: parsed.html || null,
+              text: parsed.text || "",
+              snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ').trim() : ""
             }
           }
         };
