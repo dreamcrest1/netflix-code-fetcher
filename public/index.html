@@ -7,9 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-between p-4 sm:p-6 font-sans">
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 font-sans overflow-hidden">
 
-  <div class="w-full max-w-xl my-auto space-y-6">
+  <div class="w-full max-w-xl space-y-6 flex flex-col h-full max-h-screen overflow-y-auto">
     <div class="text-center space-y-3">
       <div class="inline-flex items-center gap-2 px-3 py-1 bg-red-600/10 border border-red-600/30 text-red-500 rounded-full text-xs font-semibold uppercase">
         <i class="fa-solid fa-envelope-open-text"></i> Latest Email Portal
@@ -39,30 +39,30 @@
       <span id="errorMessage">Unable to fetch mail.</span>
     </div>
 
-    <div id="resultBox" class="hidden bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
-      <div class="border-b border-zinc-800 p-5 space-y-3">
-        <div class="flex items-start justify-between gap-4">
-          <h2 id="emailSubject" class="text-base font-semibold text-white leading-snug">---</h2>
+    <div id="resultBox" class="hidden bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col flex-1 sm:flex-none sm:max-h-96">
+      <div class="border-b border-zinc-800 p-4 sm:p-5 space-y-3 shrink-0">
+        <div class="flex items-start justify-between gap-3 sm:gap-4">
+          <h2 id="emailSubject" class="text-sm sm:text-base font-semibold text-white leading-snug break-words">---</h2>
           <span id="emailTime" class="shrink-0 text-xs bg-zinc-950 border border-zinc-800 text-zinc-400 px-2 py-1 rounded whitespace-nowrap">--</span>
         </div>
         <div class="space-y-1 text-xs">
-          <div class="flex gap-2">
-            <span class="text-zinc-500 font-semibold uppercase w-12 shrink-0">From</span>
+          <div class="flex gap-2 min-w-0">
+            <span class="text-zinc-500 font-semibold uppercase shrink-0">From</span>
             <span id="emailFrom" class="text-zinc-300 break-all">---</span>
           </div>
-          <div class="flex gap-2">
-            <span class="text-zinc-500 font-semibold uppercase w-12 shrink-0">To</span>
+          <div class="flex gap-2 min-w-0">
+            <span class="text-zinc-500 font-semibold uppercase shrink-0">To</span>
             <span id="emailTo" class="text-zinc-300 break-all">---</span>
           </div>
         </div>
       </div>
 
-      <div class="p-5">
-        <span class="text-xs text-zinc-500 font-semibold uppercase">Email Content</span>
-        <div id="emailBody" class="mt-2 bg-white text-zinc-900 rounded-xl overflow-hidden">
-          <iframe id="emailFrame" class="w-full rounded-xl bg-white" style="min-height: 320px; border: 0;" sandbox="allow-same-origin allow-popups" title="Email content"></iframe>
+      <div class="p-4 sm:p-5 overflow-y-auto flex-1">
+        <span class="text-xs text-zinc-500 font-semibold uppercase block mb-2">Email Content</span>
+        <div id="emailBody" class="bg-white text-zinc-900 rounded-xl overflow-hidden">
+          <iframe id="emailFrame" class="w-full rounded-xl bg-white" style="min-height: 200px; border: 0; display: block;" sandbox="allow-same-origin allow-popups" title="Email content"></iframe>
         </div>
-        <pre id="emailText" class="hidden mt-2 whitespace-pre-wrap break-words bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-xl p-4 text-sm leading-relaxed font-mono max-h-96 overflow-auto"></pre>
+        <pre id="emailText" class="hidden mt-2 whitespace-pre-wrap break-words bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-xl p-3 sm:p-4 text-xs sm:text-sm leading-relaxed font-mono overflow-auto max-h-56"></pre>
       </div>
     </div>
   </div>
@@ -127,11 +127,15 @@
     }
 
     // Auto-resize the iframe to fit the full email once it loads.
+    // Cap the height on mobile (max 300px) and desktop (max 600px) to prevent overflow.
     document.getElementById('emailFrame').addEventListener('load', function () {
       try {
         const doc = this.contentDocument || this.contentWindow.document;
         if (doc && doc.body) {
-          this.style.height = (doc.body.scrollHeight + 24) + 'px';
+          const scrollHeight = doc.body.scrollHeight + 24;
+          const isMobile = window.innerWidth < 640;
+          const maxHeight = isMobile ? 300 : 600;
+          this.style.height = Math.min(scrollHeight, maxHeight) + 'px';
         }
       } catch (e) { /* cross-origin, keep default height */ }
     });
