@@ -143,9 +143,15 @@ module.exports = async (req, res) => {
         let emailIndex = status.messages;
 
         while (emailIndex > 0 && !foundValidEmail) {
-          const message = await client.fetchOne(`${emailIndex}`, { source: true, envelope: true });
+          const message = await client.fetchOne(`${emailIndex}`, {
+            source: true,
+            envelope: true,
+            internalDate: true
+          });
           const parsed = await simpleParser(message.source);
-          const receivedAt = parsed.date || message.envelope?.date;
+          // Use IMAP INTERNALDATE: the server's actual arrival time. The email
+          // Date header can be hours old or set by the sender's timezone.
+          const receivedAt = message.internalDate || message.envelope?.date || parsed.date;
           const receivedTime = receivedAt ? new Date(receivedAt).getTime() : NaN;
 
           // Since messages are scanned newest-first, older mail ends the search.
