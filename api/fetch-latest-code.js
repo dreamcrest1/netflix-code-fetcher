@@ -131,37 +131,46 @@ module.exports = async (req, res) => {
     let payload;
     try {
       const status = await client.status('INBOX', { messages: true });
+      const NO_RECENT_EMAIL_MESSAGE = "No emails found kindly resend the email from TV";
+
       if (status.messages === 0) {
-        payload = { statusCode: 404, body: { success: false, message: "Inbox is empty." } };
+        payload = { statusCode: 404, body: { success: false, message: NO_RECENT_EMAIL_MESSAGE } };
       } else {
-        // Skip emails with subject "Netflix: your sign-in code" and fetch the next valid email
+        // Scan newest-to-oldest, but only accept messages received in the last 10 minutes.
         const SKIP_SUBJECTS = ["Netflix: your sign-in code"];
+        const recentSince = Date.now() - (10 * 60 * 1000);
         let foundValidEmail = false;
         let emailIndex = status.messages;
 
         while (emailIndex > 0 && !foundValidEmail) {
           const message = await client.fetchOne(`${emailIndex}`, { source: true, envelope: true });
           const parsed = await simpleParser(message.source);
+          const receivedAt = parsed.date || message.envelope?.date;
+          const receivedTime = receivedAt ? new Date(receivedAt).getTime() : NaN;
+
+          // Since messages are scanned newest-first, older mail ends the search.
+          if (!Number.isFinite(receivedTime) || receivedTime < recentSince) {
+            break;
+          }
+
           const emailSubject = parsed.subject || "No Subject";
 
-          // Check if this email should be skipped
           if (SKIP_SUBJECTS.some(skipSubject => emailSubject.includes(skipSubject))) {
-            console.log(`[v0] Skipping email with subject: ${emailSubject}`);
+            console.log(`[v0] Skipping recent email with subject: ${emailSubject}`);
             emailIndex--;
             continue;
           }
 
-          // Valid email found
           payload = {
             statusCode: 200,
             body: {
               success: true,
               data: {
-                email: email,
+                email,
                 subject: emailSubject,
                 from: parsed.from?.text || "Unknown Sender",
                 to: parsed.to?.text || email,
-                date: parsed.date || new Date(),
+                date: receivedAt,
                 html: parsed.html || null,
                 text: parsed.text || "",
                 snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ').trim() : ""
@@ -171,9 +180,8 @@ module.exports = async (req, res) => {
           foundValidEmail = true;
         }
 
-        // If no valid email found, return error
         if (!foundValidEmail) {
-          payload = { statusCode: 404, body: { success: false, message: "No valid emails found. All recent emails are sign-in codes." } };
+          payload = { statusCode: 404, body: { success: false, message: NO_RECENT_EMAIL_MESSAGE } };
         }
       }
     } finally {

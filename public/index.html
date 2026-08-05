@@ -286,11 +286,11 @@
 
         clearTimeout(timeoutId);
 
-        if (!res.ok) {
-          throw new Error(`Server error: ${res.status}`);
-        }
+        const result = await res.json().catch(() => ({}));
 
-        const result = await res.json();
+        if (!res.ok) {
+          throw new Error(result.message || `Server error: ${res.status}`);
+        }
 
         if (!result.success) {
           throw new Error(result.message || 'Error fetching email');
