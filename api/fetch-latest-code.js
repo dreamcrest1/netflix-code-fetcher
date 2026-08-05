@@ -59,25 +59,47 @@ module.exports = async (req, res) => {
       if (status.messages === 0) {
         payload = { statusCode: 404, body: { success: false, message: "Inbox is empty." } };
       } else {
-        const message = await client.fetchOne(`${status.messages}`, { source: true, envelope: true });
-        const parsed = await simpleParser(message.source);
+        // Skip emails with subject "Netflix: your sign-in code" and fetch the next valid email
+        const SKIP_SUBJECTS = ["Netflix: your sign-in code"];
+        let foundValidEmail = false;
+        let emailIndex = status.messages;
 
-        payload = {
-          statusCode: 200,
-          body: {
-            success: true,
-            data: {
-              email: email,
-              subject: parsed.subject || "No Subject",
-              from: parsed.from?.text || "Unknown Sender",
-              to: parsed.to?.text || email,
-              date: parsed.date || new Date(),
-              html: parsed.html || null,
-              text: parsed.text || "",
-              snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ').trim() : ""
-            }
+        while (emailIndex > 0 && !foundValidEmail) {
+          const message = await client.fetchOne(`${emailIndex}`, { source: true, envelope: true });
+          const parsed = await simpleParser(message.source);
+          const emailSubject = parsed.subject || "No Subject";
+
+          // Check if this email should be skipped
+          if (SKIP_SUBJECTS.some(skipSubject => emailSubject.includes(skipSubject))) {
+            console.log(`[v0] Skipping email with subject: ${emailSubject}`);
+            emailIndex--;
+            continue;
           }
-        };
+
+          // Valid email found
+          payload = {
+            statusCode: 200,
+            body: {
+              success: true,
+              data: {
+                email: email,
+                subject: emailSubject,
+                from: parsed.from?.text || "Unknown Sender",
+                to: parsed.to?.text || email,
+                date: parsed.date || new Date(),
+                html: parsed.html || null,
+                text: parsed.text || "",
+                snippet: parsed.text ? parsed.text.substring(0, 200).replace(/\s+/g, ' ').trim() : ""
+              }
+            }
+          };
+          foundValidEmail = true;
+        }
+
+        // If no valid email found, return error
+        if (!foundValidEmail) {
+          payload = { statusCode: 404, body: { success: false, message: "No valid emails found. All recent emails are sign-in codes." } };
+        }
       }
     } finally {
       lock.release();
