@@ -80,8 +80,18 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Add security and cross-device compatibility headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   if (req.url.startsWith('/api/fetch-latest-code')) {
     req.body = await readBody(req);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     adaptResponse(res);
     try {
       await fetchLatestCode(req, res);
