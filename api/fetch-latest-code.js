@@ -152,10 +152,13 @@ module.exports = async (req, res) => {
           const parsed = await simpleParser(message.source);
           // Use IMAP INTERNALDATE: the server's actual arrival time. The email
           // Date header can be hours old or set by the sender's timezone.
-          const receivedAt = message.internalDate;
-          const receivedTime = receivedAt instanceof Date
-            ? receivedAt.getTime()
-            : NaN;
+          const rawReceivedAt = message.internalDate;
+          const receivedTime = rawReceivedAt instanceof Date
+            ? rawReceivedAt.getTime()
+            : (typeof rawReceivedAt === 'string' ? Date.parse(rawReceivedAt) : NaN);
+          const receivedAt = Number.isFinite(receivedTime)
+            ? new Date(receivedTime)
+            : null;
 
           // Since messages are scanned newest-first, older mail ends the search.
           if (!Number.isFinite(receivedTime) || receivedTime < recentSince) {
