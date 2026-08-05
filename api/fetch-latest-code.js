@@ -30,12 +30,35 @@ async function fetchAccountsFromSheet() {
     // Parse CSV (skip header row)
     const newAccounts = {};
     for (let i = 1; i < lines.length; i++) {
-      const [email, password] = lines[i].split(',').map(v => v.trim());
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Parse CSV line - handle quoted values with commas
+      let parts = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          parts.push(current.replace(/^"|"$/g, '').trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      parts.push(current.replace(/^"|"$/g, '').trim());
+      
+      const [email, password] = parts;
       if (email && password) {
-        newAccounts[email.toLowerCase()] = {
+        const emailLower = email.toLowerCase().trim();
+        newAccounts[emailLower] = {
           ...COMMON_HOST_CONFIG,
           auth: { user: email, pass: password }
         };
+        console.log(`[v0] Added account: ${emailLower}`);
       }
     }
 

@@ -178,9 +178,30 @@
         const lines = csv.trim().split('\n');
         
         const emails = [];
-        // Parse CSV (skip header row)
+        // Parse CSV (skip header row) - handle quoted values
         for (let i = 1; i < lines.length; i++) {
-          const [email] = lines[i].split(',').map(v => v.trim());
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          // Parse CSV line with proper quote handling
+          let parts = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              parts.push(current.replace(/^"|"$/g, '').trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          parts.push(current.replace(/^"|"$/g, '').trim());
+          
+          const email = parts[0];
           if (email && email.includes('@')) {
             emails.push(email);
           }
