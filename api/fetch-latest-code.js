@@ -84,6 +84,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method Not Allowed' });
@@ -151,8 +152,10 @@ module.exports = async (req, res) => {
           const parsed = await simpleParser(message.source);
           // Use IMAP INTERNALDATE: the server's actual arrival time. The email
           // Date header can be hours old or set by the sender's timezone.
-          const receivedAt = message.internalDate || message.envelope?.date || parsed.date;
-          const receivedTime = receivedAt ? new Date(receivedAt).getTime() : NaN;
+          const receivedAt = message.internalDate;
+          const receivedTime = receivedAt instanceof Date
+            ? receivedAt.getTime()
+            : NaN;
 
           // Since messages are scanned newest-first, older mail ends the search.
           if (!Number.isFinite(receivedTime) || receivedTime < recentSince) {
