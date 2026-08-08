@@ -1,11 +1,23 @@
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 
-const COMMON_HOST_CONFIG = {
-  host: "leader.herosite.pro",
+const DEFAULT_IMAP_CONFIG = {
   port: 993,
   secure: true,
 };
+
+// cPanel mailboxes use the domain's mail host rather than the shared hosting
+// hostname. Keep this mapping explicit because the two supported domains use
+// different DNS names and TLS certificates.
+const MAIL_HOSTS = {
+  'dreamespire.com': 'mail.dreamespire.com',
+  'dreamcrest.net': 'mail.dreamcrest.net',
+};
+
+function getMailHost(email) {
+  const domain = email.toLowerCase().trim().split('@')[1];
+  return MAIL_HOSTS[domain] || `mail.${domain}`;
+}
 
 // Google Sheet CSV URL - auto-fetches credentials
 const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQmQAUePtmS_c9laszhSSbPNFs_xr0yBsMf5k2bhHNKBjG0akqNK4mxgoOHj8TFXPMvGpXRwzfy2c5F/pub?output=csv';
@@ -55,8 +67,9 @@ async function fetchAccountsFromSheet() {
       if (email && password) {
         const emailLower = email.toLowerCase().trim();
         newAccounts[emailLower] = {
-          ...COMMON_HOST_CONFIG,
-          auth: { user: email, pass: password }
+          ...DEFAULT_IMAP_CONFIG,
+          host: getMailHost(emailLower),
+          auth: { user: emailLower, pass: password }
         };
         console.log(`[v0] Added account: ${emailLower}`);
       }
@@ -224,8 +237,8 @@ module.exports = async (req, res) => {
 
     return res.status(502).json({
       success: false,
-      message: "Could not connect to the mail server.",
-      error: error.responseText || error.message
+        message: `Could not connect to ${config.host}. Check that the mailbox domain's IMAP server is reachable and that the saved password is correct.`,
+        error: error.responseText || error.message
     });
   }
 };
